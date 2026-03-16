@@ -45,6 +45,7 @@ target_link_libraries(remora-compiler PRIVATE
   MLIRArithDialect
   MLIRTensorDialect
   MLIRRegisterAllDialects
+  MLIRRegisterAllExtensions
   MLIRRegisterAllPasses
   StablehloBase
   StablehloAssemblyFormat

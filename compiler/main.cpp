@@ -8,6 +8,7 @@
 #include "stablehlo/dialect/Register.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/InitAllExtensions.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/conversions/linalg/transforms/Passes.h"
@@ -25,6 +26,7 @@ int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
   mlir::registerAllDialects(registry);
   mlir::stablehlo::registerAllDialects(registry);
+  mlir::registerAllExtensions(registry);
 
   /// https://github.com/llvm/llvm-project/blob/f46a5153850c1303d687233d4adf699b01041da8/mlir/include/mlir/IR/MLIRContext.h#L41
   /// MLIRContext is the top-level object for a collection of MLIR operations. It
@@ -49,6 +51,11 @@ int main(int argc, char **argv) {
       mlir::parseSourceFile<mlir::ModuleOp>(argv[1], &ctx);
   if (!module) {
     llvm::errs() << "Failed to parse: " << argv[1] << "\n";
+    return 1;
+  }
+
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Pass pipeline failed\n";
     return 1;
   }
 
