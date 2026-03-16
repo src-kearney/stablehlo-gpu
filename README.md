@@ -1,6 +1,8 @@
 # remora
 
-Exploring MoE compiler lowering via StableHLO → Linalg → GPU backends.
+[Remora](https://scryfall.com/card/ice/87/mystic-remora) is an MLIR compiler that lowers StableHLO programs to heterogeneous GPU targets, statically placing sparse expert subgraphs across NVIDIA and AMD backends from a single IR source.
+
+`StableHLO → Linalg → heterogenous GPU backends`
 
 ## Directory structure
 
