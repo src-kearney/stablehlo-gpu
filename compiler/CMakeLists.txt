@@ -50,9 +50,11 @@ target_link_libraries(remora-compiler PRIVATE
   StablehloAssemblyFormat
   StablehloBroadcastUtils
   StablehloBroadcastLowering
+  StablehloLinalgTransforms
   StablehloOps
   StablehloPasses
   StablehloRegister
+  StablehloTypeConversion
   StablehloTypeInference
   VhloOps
   VhloTypes
