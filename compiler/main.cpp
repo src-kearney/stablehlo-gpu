@@ -28,6 +28,49 @@
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
+#include <vector>
+
+// Run the elementwise kernel via the JIT engine and print a sample of the output.
+// Inputs: x = all 1.0, bias = all -0.5
+// Expected: relu(1.0 + (-0.5)) = relu(0.5) = 0.5 everywhere
+static int runElementwise(mlir::ExecutionEngine &engine) {
+  const int64_t N = 1, T = 512, D = 768;
+  std::vector<float> x_data(N * T * D, 1.0f);
+  std::vector<float> bias_data(D, -0.5f);
+
+  StridedMemRefType<float, 3> x_desc;
+  x_desc.basePtr = x_desc.data = x_data.data();
+  x_desc.offset = 0;
+  x_desc.sizes[0] = N; x_desc.sizes[1] = T; x_desc.sizes[2] = D;
+  x_desc.strides[0] = T * D; x_desc.strides[1] = D; x_desc.strides[2] = 1;
+
+  StridedMemRefType<float, 1> bias_desc;
+  bias_desc.basePtr = bias_desc.data = bias_data.data();
+  bias_desc.offset = 0;
+  bias_desc.sizes[0] = D;
+  bias_desc.strides[0] = 1;
+
+  // result is malloc'd inside the kernel; the descriptor is filled by the wrapper
+  StridedMemRefType<float, 3> result;
+
+  // _mlir_ciface_main(result*, x*, bias*) — each arg is a pointer to a memref descriptor.
+  // Call directly (not via invokePacked) to preserve the 3-arg C calling convention.
+  auto sym = engine.lookup("_mlir_ciface_main");
+  if (!sym) {
+    llvm::handleAllErrors(sym.takeError(), [](const llvm::ErrorInfoBase &e) {
+      llvm::errs() << "Symbol lookup failed: " << e.message() << "\n";
+    });
+    return 1;
+  }
+  auto *fn = reinterpret_cast<void (*)(void *, void *, void *)>(*sym);
+  fn(&result, &x_desc, &bias_desc);
+
+  llvm::outs() << "result[0][0][0] = " << result.data[0] << " (expected 0.5)\n";
+  llvm::outs() << "result[0][0][1] = " << result.data[1] << " (expected 0.5)\n";
+  free(result.basePtr);
+  return 0;
+}
+
 int main(int argc, char **argv) {
   if (argc < 2) {
     llvm::errs() << "Usage: remora-compiler <input.mlir>\n";
@@ -94,6 +137,13 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::createConvertFuncToLLVMPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
 
+  // Must run before pass pipeline so createConvertFuncToLLVMPass generates the wrapper
+  module->walk([](mlir::func::FuncOp func) {
+    if (func.isPublic())
+      func->setAttr("llvm.emit_c_interface",
+        mlir::UnitAttr::get(func.getContext()));
+  });
+  
   if (mlir::failed(pm.run(*module))) {
     llvm::errs() << "Pass pipeline failed\n";
     return 1;
@@ -109,8 +159,6 @@ int main(int argc, char **argv) {
     });
     return 1;
   }
-  auto &engine = maybeEngine.get();
 
-  /// TODO invoke on function (probably `main`, whatever func module->print outputs)
-  return 0;
+  return runElementwise(*maybeEngine.get());
 }
