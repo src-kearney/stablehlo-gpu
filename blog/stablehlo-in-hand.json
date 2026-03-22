@@ -27,7 +27,7 @@
     {
       "type": "text",
       "content": [
-        "With `stablehlo-opt` built, I pointed it at [the MLIR file](https://github.com/src-kearney/stablehlo-gpu/blob/main/attention-jax-export/simple_attention_elementwise.mlir) from [From JAX to Metal](/book/from-jax-to-metal): a bias add followed by ReLU.",
+        "With `stablehlo-opt` built, I pointed it at [the MLIR file](https://github.com/src-kearney/remora/blob/main/attention-jax-export/simple_attention_elementwise.mlir) from [From JAX to Metal](/book/from-jax-to-metal): a bias add followed by ReLU.",
         "```bash\n./build/bin/stablehlo-opt simple_attention_elementwise.mlir\n```",
         "```mlir\nmodule @jit_elementwise {\n  func.func public @main(%arg0: tensor<1x512x768xf32>, %arg1: tensor<768xf32>)\n      -> tensor<1x512x768xf32> {\n    %0 = stablehlo.broadcast_in_dim %arg1, dims = [2]\n             : (tensor<768xf32>) -> tensor<1x1x768xf32>\n    %1 = stablehlo.broadcast_in_dim %0, dims = [0, 1, 2]\n             : (tensor<1x1x768xf32>) -> tensor<1x512x768xf32>\n    %2 = stablehlo.add %arg0, %1 : tensor<1x512x768xf32>\n    %3 = call @relu(%2) : (tensor<1x512x768xf32>) -> tensor<1x512x768xf32>\n    return %3 : tensor<1x512x768xf32>\n  }\n  func.func private @relu(%arg0: tensor<1x512x768xf32>) -> tensor<1x512x768xf32> {\n    %cst = stablehlo.constant dense<0.000000e+00> : tensor<f32>\n    %0 = stablehlo.broadcast_in_dim %cst, dims = []\n             : (tensor<f32>) -> tensor<1x512x768xf32>\n    %1 = stablehlo.maximum %arg0, %0 : tensor<1x512x768xf32>\n    return %1 : tensor<1x512x768xf32>\n  }\n}\n```"
       ]

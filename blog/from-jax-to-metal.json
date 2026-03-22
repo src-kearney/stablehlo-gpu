@@ -144,10 +144,10 @@
     {
       "content": [
         "The philosophy of Python is that you can write a single, concise line of code to accomplish something powerful without worrying about the 5 triple kickflips it has to do under the hood to accomplish that something. The kickflips are abstracted away.",
-        "MLIR does not share this quality with Python. The projection is six lines. The elementwise pass is twenty-five. One Python call became one MLIR op. One Python expression (`relu(x + bias)`) became two broadcasts, an add, a constant, another broadcast, and a max.",
+        "Comparatively, MLIR does not share this quality with Python. The projection is six lines. The elementwise pass is twenty-five. One Python call became one MLIR op. One Python expression (`relu(x + bias)`) became two broadcasts, an add, a constant, another broadcast, and a max.",
         "This verbosity is the point. StableHLO makes every implicit operation explicit. Python broadcasting is invisible. In MLIR it costs two ops. Python `relu` is sugar. In MLIR it's `max(x, 0)`, spelled out explicitly. It also reveals the optimization opportunity. Those five ops: broadcast, broadcast, add, broadcast, and max, are all elementwise. They touch every one of the `1 × 512 × 768 = 393,216` values in the tensor independently. A naive backend launches five separate GPU kernels. A smart compiler fuses them into one. That fusion pass is part of what this series builds.",
         "The IR is in hand. Now the actual work begins.",
-        "> [github.com/src-kearney/stablehlo-gpu](https://github.com/src-kearney/stablehlo-gpu/tree/main/attention-jax-export)"
+        "> [github.com/src-kearney/remora](https://github.com/src-kearney/remora/tree/main/attention-jax-export)"
       ],
       "type": "text"
     }
