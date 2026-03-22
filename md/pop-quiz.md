@@ -83,3 +83,43 @@ On the heap, allocated through Context's internal allocator. Context owns type/a
 > What happens if you add a pass that requires a dialect that isn't registered?
 
 Pass manager fails with `LogicalResult::failure` in pass precondition verification before running.
+
+> What does DialectRegistry do and why does it exist separately from MLIRContext?
+
+> Why does the module->walk to add llvm.emit_c_interface have to run before pm.run and not after?
+
+> What is _mlir_ciface_main and why does engine.lookup look for that name instead of just main?
+
+> What does reconcile-unrealized-casts do and why is it the last pass?
+
+> Why does the kernel do its own malloc internally, and why do you free(result.basePtr) instead of free(result.data)?
+
+## Kernel invocation
+
+> StridedMemRefType has two pointers: basePtr and data. What is each one for, and why do we set them to the same value for our input descriptors?
+
+`basePtr` is the pointer to the original allocation — the one you pass to `free`. `data` is the pointer to where element [0,0,...,0] actually lives, which may be offset forward from `basePtr` for alignment reasons. When you do an aligned `malloc`, the allocator might hand you a slightly forward pointer for cache-line alignment; `basePtr` remembers where the actual allocation started so the runtime can free it correctly.
+
+For our inputs we set both to `x_data.data()` because `std::vector` gives us a plain allocation with no alignment gap — offset is 0 and both pointers are the same.
+
+> What does `reinterpret_cast<void (*)(void *, void *, void *)>(*sym)` actually do, and why is the cast necessary?
+
+`engine.lookup()` returns the raw symbol address as a `void *` — just a number, no type information. The CPU doesn't know how to pass arguments to a function stored as `void *`. The `reinterpret_cast` tells the compiler "treat this address as a function that takes three `void *` arguments and returns nothing", so the compiler emits the correct calling-convention sequence: put `&result` in register x0, `&x_desc` in x1, `&bias_desc` in x2, then branch-and-link.
+
+Without the cast, you can't call the pointer at all — C++ has no syntax for calling a `void *`.
+
+> We originally tried `engine.invokePacked("_mlir_ciface_main", args)` and got a segfault. Why?
+
+`invokePacked` treats the function as `void(*)(void**)` — it puts the address of the `args` array in a single register (x0) and calls. But `_mlir_ciface_main` was compiled expecting three separate `void*` arguments in x0, x1, x2. Those registers contain garbage, so it reads a bogus `x_desc` pointer and crashes. The fix is `engine.lookup` + a direct call with the correct 3-argument signature.
+
+> Why does `createLinalgElementwiseOpFusionPass` need `createInlinerPass` to run before it?
+
+The StableHLO file defines `@relu` as a separate private function and calls it from `@main`. After `createStablehloLegalizeToLinalgPass`, `@relu` is still a separate function — the fusion pass can only fuse ops it can see together, and it can't look across a function call boundary.
+
+`createInlinerPass` copies `@relu`'s body into every call site, so `@main` now contains all the `linalg.generic` ops (broadcast, add, maximum) in sequence. Only then can `createLinalgElementwiseOpFusionPass` collapse them into a single fused `linalg.generic` with all three ops in its body.
+
+> What does `bufferizeFunctionBoundaries = true` do, and what error do you see without it?
+
+By default, one-shot bufferization only bufferizes ops *inside* functions — it leaves function arguments and return types as tensors. With `bufferizeFunctionBoundaries = false`, `@main` ends up returning a tensor, `bufferization.to_tensor` ops survive, and when `createConvertFuncToLLVMPass` runs it fails because LLVM dialect has no tensor type.
+
+Setting `bufferizeFunctionBoundaries = true` tells bufferization to also rewrite function signatures: `tensor<1x512x768xf32>` arguments become `memref<...>` arguments, and the return value becomes a `memref` too. This is what allows the entire pipeline to reach pure LLVM dialect with no tensors remaining.
