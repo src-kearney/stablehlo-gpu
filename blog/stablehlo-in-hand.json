@@ -12,7 +12,7 @@
       "type": "text",
       "content": [
         "Alrighty. With the MLIR in hand, it's time to convert our MLIR to MLIR.",
-        "Our starting point, StableHLO, is a high-level dialect of MLIR, and now we want to take it one step closer to the GPU. One step lower brings us to the Linalg MLIR dialect. Where StableHLO describes `what` our JAX wants to accomplish, Linalg describes `how` to accomplish it.",
+        "Our starting point, StableHLO, is a high-level dialect of MLIR, and now we want to take it one step lower - one step closer to the GPU. Where StableHLO describes `what` our JAX wants to accomplish, Linalg dialect describes `how` to accomplish it.",
         "StableHLO ships a build script that compiles MLIR from a known-good LLVM commit. The commit hash lives in `build_tools/llvm_version.txt`.",
         "```bash\ngit clone https://github.com/openxla/stablehlo.git\ncd stablehlo\ncat build_tools/llvm_version.txt\n# 1053047a4be7d1fece3adaf5e7597f838058c947\n\ngit clone https://github.com/llvm/llvm-project\ncd llvm-project && git checkout 1053047a4be7d1fece3adaf5e7597f838058c947\ncd ../stablehlo\n\nsh build_tools/build_mlir.sh ../llvm-project ../llvm-build\n```"
       ]

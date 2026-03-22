@@ -62,8 +62,8 @@
         "[\"Show me less of this\"](https://support.google.com/youtube/answer/6342839?hl=en&co=GENIE.Platform%3DAndroid) is a common feature in many recommendation systems for controlling your feed, but it's sparingly clicked by users. Bluesky is doing [interesting work](https://bsky.social/about/blog/3-30-2023-algorithmic-choice) in the space of transparent and decentralized recommendation systems. Infrastructure companies which previously catered to application developers are extending their platforms to MLEs by [providing UIs](https://www.datadoghq.com/blog/ml-model-monitoring-in-production-best-practices/) for debugging and understanding model behaviors.",
         "Despite these advances, recommendation systems remain opaque. Engineers can trace signals, tweak hyperparameters, and watch drift in dashboards, but this level of control is rarely surfaced to the end user.",
         "I often hear the argument that users cannot understand the technical intricacies of machine learning. I disagree for two reasons.",
-        "First, we underestimate people's ability to learn. A non-MLE friend of mine recently built a multi-agent simulator to test his new Magic: The Gathering deck.",
-        "Second, people cannot understand systems we hide behind opaque interfaces. If anything, it is our responsibility as experts to explain the technology we have built."
+        "First, we underestimate people's ability to learn.",
+        "Second, it doesn't make it easier to understand systems when their hidden behind interfaces. If anything, it is our responsibility as an expert of something to be able to explain the technology we have built."
       ]
     },
     {
