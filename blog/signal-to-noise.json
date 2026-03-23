@@ -99,7 +99,7 @@
     {
       "type": "text",
       "content": [
-        "**Two Towers** splits retrieval into two independent encoders: one for the user, one for the item - each producing a dense embedding. We then can take the dot product between the two embeddings to compute similarity between users (instagram scroller) and content (instagram posts). The main efficiency here comes from precomputing both embeddings offline and indexing them with something like HNSW, pgvector, or FAISS. This turns recommendation into more of a search problem, comparing a user embedding over thousands to billions precomputed content embeddings.",
+        "**[Two Towers](https://engineering.fb.com/2023/08/09/ml-applications/scaling-instagram-explore-recommendations-system/)** splits retrieval into two independent encoders: one for the user, one for the item - each producing a dense embedding. We then can take the dot product between the two embeddings to compute similarity between users (instagram scroller) and content (instagram posts). The main efficiency here comes from precomputing both embeddings offline and indexing them with something like HNSW, pgvector, or FAISS. This turns recommendation into more of a search problem, comparing a user embedding over thousands to billions precomputed content embeddings.",
         "```\n user signals          item metadata\n     │                      │\n [user tower]          [item tower]\n     │                      │\n [embedding] ──── · ──── [embedding]\n                  │\n           similarity score\n              → top-k candidates\n```"
       ]
     },
