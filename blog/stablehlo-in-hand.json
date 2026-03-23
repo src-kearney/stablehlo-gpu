@@ -134,7 +134,7 @@
     {
       "type": "text",
       "content": [
-        "Progress, but not as much dopamine as I was hoping for. The broadcasts collapsed, but the ReLU still lives as a separate op. It turns out, the fusion pass only sees ops within the same function. The add and ReLU lived in separate scopes, so it had no way to know they were a producer-consumer pair.",
+        "Progress, but not as much dopamine as I was hoping for. The broadcasts collapsed, but the ReLU still lives as a separate op. It turns out, the fusion pass only sees ops within the same function. The add and ReLU lived in separate scopes, so it had no way to know they were a [producer-consumer pair](https://mlir.llvm.org/docs/Dialects/Linalg/#fusion).",
         "Adding `--inline` first copies the ReLU body into @main. Now, the fusion pass can see them together:",
         "```bash\n./build/bin/stablehlo-opt simple_attention_elementwise.mlir \\\n  --stablehlo-legalize-to-linalg \\\n  --inline \\\n  --linalg-fuse-elementwise-ops\n```"
       ]

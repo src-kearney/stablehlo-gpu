@@ -57,9 +57,9 @@
       "type": "text",
       "content": [
         "Nutrition Facts labels only became mandatory in the 1990s, after decades of rising health concerns and consumer pressure. Before that, food companies could say almost anything, and you had no standardized way to know what you were eating.",
-        "We can draw parallels from pre-1990s nutrition to many our most beloved machine learning products. Recommendation systems today are both massively impactful and almost entirely opaque. We rarely know all of the incentives and optimization targets behind the feeds we consume. Perhaps individual pieces of content, or models, or algorithms, should require **Nutrition Facts**.",
+        "We can draw parallels from pre-1990s nutrition to many our most beloved machine learning products. Recommendation systems today are both massively impactful and still somewhat opaque. We rarely know all of the incentives and optimization targets behind the feeds we consume. Perhaps individual pieces of content, or models, or algorithms, should come along with **Nutrition Facts**.",
         "-----",
-        "[\"Show me less of this\"](https://support.google.com/youtube/answer/6342839?hl=en&co=GENIE.Platform%3DAndroid) is a common feature in many recommendation systems for controlling your feed, but it's sparingly clicked by users. Bluesky is doing [interesting work](https://bsky.social/about/blog/3-30-2023-algorithmic-choice) in the space of transparent and decentralized recommendation systems. Infrastructure companies which previously catered to application developers are extending their platforms to MLEs by [providing UIs](https://www.datadoghq.com/blog/ml-model-monitoring-in-production-best-practices/) for debugging and understanding model behaviors.",
+        "[\"Show me less of this\"](https://support.google.com/youtube/answer/6342839?hl=en&co=GENIE.Platform%3DAndroid) is a common feature in many recommendation systems for controlling your feed, but it's sparingly clicked by users. Bluesky is doing [interesting work](https://bsky.social/about/blog/3-30-2023-algorithmic-choice) in the space of transparent and decentralized recommendation systems. Uber, [Instagram Explore](https://engineering.fb.com/2023/08/09/ml-applications/scaling-instagram-explore-recommendations-system/), and many others adopted the two-towers model architecture. And [it turns out](https://arxiv.org/abs/1905.06874), the sequential nature of transformers lends itself well to recommenders. Anthropic and OpenAI are doubling down on the \"bigger is better\" approach - throwing [eye-watering sums of cash](https://openai.com/index/announcing-the-stargate-project/) into pretraining colossal models. An extension of transformers, [Mixture of Experts](https://arxiv.org/abs/1701.06538), is gaining traction among companies training frontier models. The appeal is simple: each forward pass is processed by only the top-k experts (each a feedforward network), rather than the full model.",
         "Despite these advances, recommendation systems remain opaque. Engineers can trace signals, tweak hyperparameters, and watch drift in dashboards, but this level of control is rarely surfaced to the end user.",
         "I often hear the argument that users cannot understand the technical intricacies of machine learning. I disagree for two reasons.",
         "First, we underestimate people's ability to learn.",
@@ -82,6 +82,39 @@
       "content": [
         "When a user explicitly tells a system what they want, that shouldn't be treated as just another feature alongside dwell time or scroll velocity. In opaque systems built on inferred behavioral signals, it may be the clearest signal the model will ever receive.",
         "They are the experts in their own taste, after all."
+      ]
+    },
+    {
+      "type": "text",
+      "content": [
+        "-----",
+        "\n\n> The upcoming piece is just a skeleton.\n\nBut how should users actually inform a recommendation system about what they want? If you could explicitly design the perfect social media feed, how would you control it? Though there have been many good ideas — ranked feeds, topic filters, algorithmic transparency dashboards — this is not a solved problem.",
+        "So what does better look like architecturally?"
+      ]
+    },
+    {
+      "type": "component",
+      "name": "TwoTowers"
+    },
+    {
+      "type": "text",
+      "content": [
+        "**Two Towers** splits retrieval into two independent encoders — one for the user, one for the item — each producing a dense embedding. Similarity is a dot product. Item embeddings are pre-computed offline and indexed; the user tower runs once per request, narrowing a billion candidates to hundreds in under a millisecond.",
+        "```\n user signals          item metadata\n     │                      │\n [user tower]          [item tower]\n     │                      │\n [embedding] ──── · ──── [embedding]\n                  │\n           similarity score\n              → top-k candidates\n```"
+      ]
+    },
+    {
+      "type": "text",
+      "content": [
+        "**BST ([Alibaba, 2019](https://arxiv.org/abs/1905.06874))** applies transformer self-attention across a user's ordered interaction history rather than averaging it. The model learns which past items are most relevant to the current moment — and encodes *time offset* from the target item instead of absolute position.",
+        "```\n item₋₄   item₋₃   item₋₂   item₋₁   target\n (Δt=−4d) (Δt=−3d) (Δt=−1d) (Δt=−2h)   │\n   │         │         │         │        │\n   └─────────┴────── attention ──┴────────┘\n                         │\n                   user embedding\n```"
+      ]
+    },
+    {
+      "type": "text",
+      "content": [
+        "**Mixture of Experts ([Shazeer et al., 2017](https://arxiv.org/abs/1701.06538))** replaces a single feedforward network with N specialized experts and a gating network that routes each token to only the top-k of them. Most of the model is idle on any given input — you get a much larger effective model for roughly the same compute cost per forward pass.",
+        "```\n          input token\n               │\n        [gating network]\n       ┌───┬───┴───┬───┐\n     FFN₁ FFN₂  FFN₃ FFN₄   ← N experts\n       ✗    ✓     ✓    ✗    ← top-2 selected\n            │     │\n       [weighted sum]\n            │\n          output\n```"
       ]
     }
   ]
