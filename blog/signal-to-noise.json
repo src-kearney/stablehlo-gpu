@@ -89,7 +89,7 @@
       "content": [
         "-----",
         "\n\n> The upcoming piece is just a skeleton. Very rough draft, trying to write an intro which leads into 2t, then transformers, then MoE.\n\nBut how should users explain to a recommendation system exactly what they want? Do users actually know what they want? You could make the argument that a convoluted, maximalist UI provides a structured buffer of time, giving users a chance to piece together what they actually want out of the thing. So, what's the best way for a user to control their algorithm? Is there a way that incentivizes agency over the conveyor belt? Or at the bare minimum, how do we give recommendation preference options users actually want to use? Though we've seen no shortage of good ideas, this is not a solved problem.",
-        "Now that we understand the need, it's time to dive in - it's time to better understand the state of the art in deep learning."
+        "Now that we understand the need, it's time to better understand the state of the art in deep learning."
       ]
     },
     {
