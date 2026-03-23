@@ -88,8 +88,8 @@
       "type": "text",
       "content": [
         "-----",
-        "\n\n> The upcoming piece is just a skeleton.\n\nBut how should users actually inform a recommendation system about what they want? If you could explicitly design the perfect social media feed, how would you control it? Though there have been many good ideas — ranked feeds, topic filters, algorithmic transparency dashboards — this is not a solved problem.",
-        "So what does better look like architecturally?"
+        "\n\n> The upcoming piece is just a skeleton. Very rough draft, trying to write an intro which leads into 2t, then transformers, then MoE.\n\nBut how should users explain to a recommendation system exactly what they want? Do users actually know what they want? You could make the argument that a convoluted, maximalist UI provides a structured buffer of time, giving users a chance to piece together what they actually want out of the thing. So, what's the best way for a user to control their algorithm? Is there a way that incentivizes agency over the conveyor belt? Or at the bare minimum, how do we give recommendation preference options users actually want to use? Though we've seen no shortage of good ideas, this is not a solved problem.",
+        "Now that we understand the need, it's time to dive in - it's time to better understand the state of the art in deep learning."
       ]
     },
     {
@@ -99,21 +99,21 @@
     {
       "type": "text",
       "content": [
-        "**Two Towers** splits retrieval into two independent encoders — one for the user, one for the item — each producing a dense embedding. Similarity is a dot product. Item embeddings are pre-computed offline and indexed; the user tower runs once per request, narrowing a billion candidates to hundreds in under a millisecond.",
+        "**Two Towers** splits retrieval into two independent encoders: one for the user, one for the item - each producing a dense embedding. We then can take the dot product between the two embeddings to compute similarity between users (instagram scroller) and content (instagram posts). The main efficiency here comes from precomputing both embeddings offline and indexing them with something like HNSW, pgvector, or FAISS. This turns recommendation into more of a search problem, comparing a user embedding over thousands to billions precomputed content embeddings.",
         "```\n user signals          item metadata\n     │                      │\n [user tower]          [item tower]\n     │                      │\n [embedding] ──── · ──── [embedding]\n                  │\n           similarity score\n              → top-k candidates\n```"
       ]
     },
     {
       "type": "text",
       "content": [
-        "**BST ([Alibaba, 2019](https://arxiv.org/abs/1905.06874))** applies transformer self-attention across a user's ordered interaction history rather than averaging it. The model learns which past items are most relevant to the current moment — and encodes *time offset* from the target item instead of absolute position.",
+        "**BST ([Alibaba, 2019](https://arxiv.org/abs/1905.06874))** applies transformer self-attention across a user's ordered interaction history rather than averaging it. The model learns which past items are most relevant to the current moment and encodes *time offset* from the target item instead of absolute position.",
         "```\n item₋₄   item₋₃   item₋₂   item₋₁   target\n (Δt=−4d) (Δt=−3d) (Δt=−1d) (Δt=−2h)   │\n   │         │         │         │        │\n   └─────────┴────── attention ──┴────────┘\n                         │\n                   user embedding\n```"
       ]
     },
     {
       "type": "text",
       "content": [
-        "**Mixture of Experts ([Shazeer et al., 2017](https://arxiv.org/abs/1701.06538))** replaces a single feedforward network with N specialized experts and a gating network that routes each token to only the top-k of them. Most of the model is idle on any given input — you get a much larger effective model for roughly the same compute cost per forward pass.",
+        "**Mixture of Experts ([Shazeer et al., 2017](https://arxiv.org/abs/1701.06538))** replaces a single feedforward network with N specialized experts and a gating network that routes each token to only the top-k of them. This way, most of the model is idle on any given input. You get a much larger effective model for roughly the same compute cost per forward pass.",
         "```\n          input token\n               │\n        [gating network]\n       ┌───┬───┴───┬───┐\n     FFN₁ FFN₂  FFN₃ FFN₄   ← N experts\n       ✗    ✓     ✓    ✗    ← top-2 selected\n            │     │\n       [weighted sum]\n            │\n          output\n```"
       ]
     }
