@@ -34,6 +34,108 @@
 #include <string>
 #include <vector>
 
+namespace {
+
+std::vector<PipelineStep> buildDefaultGpuPipeline() {
+  mlir::bufferization::OneShotBufferizePassOptions bufOpts;
+  bufOpts.bufferizeFunctionBoundaries = true;
+
+  return {
+      {"stablehlo-legalize-to-linalg",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::stablehlo::createStablehloLegalizeToLinalgPass());
+         return mlir::success();
+       }},
+      {"inline",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createInlinerPass());
+         return mlir::success();
+       }},
+      {"linalg-fuse-elementwise-ops",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createLinalgElementwiseOpFusionPass());
+         return mlir::success();
+       }},
+      {"one-shot-bufferize",
+       [bufOpts](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::bufferization::createOneShotBufferizePass(bufOpts));
+         return mlir::success();
+       }},
+      {"convert-linalg-to-parallel-loops",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::func::FuncOp>(
+             mlir::createConvertLinalgToParallelLoopsPass());
+         return mlir::success();
+       }},
+      {"gpu-map-parallel-loops",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::func::FuncOp>(
+             mlir::createGpuMapParallelLoopsPass());
+         return mlir::success();
+       }},
+      {"convert-parallel-loops-to-gpu",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::func::FuncOp>(
+             mlir::createConvertParallelLoopToGpuPass());
+         return mlir::success();
+       }},
+      {"gpu-kernel-outlining",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createGpuKernelOutliningPass());
+         return mlir::success();
+       }},
+      {"lower-affine",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createLowerAffinePass());
+         return mlir::success();
+       }},
+      {"convert-scf-to-cf",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createSCFToControlFlowPass());
+         return mlir::success();
+       }},
+      {"convert-cf-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createConvertControlFlowToLLVMPass());
+         return mlir::success();
+       }},
+      {"convert-arith-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createArithToLLVMConversionPass());
+         return mlir::success();
+       }},
+      {"finalize-memref-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+         return mlir::success();
+       }},
+      {"convert-func-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createConvertFuncToLLVMPass());
+         return mlir::success();
+       }},
+      {"convert-gpu-ops-to-nvvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::gpu::GPUModuleOp>(
+             mlir::createConvertGpuOpsToNVVMOps());
+         return mlir::success();
+       }},
+      {"reconcile-unrealized-casts-gpu-module",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::gpu::GPUModuleOp>(
+             mlir::createReconcileUnrealizedCastsPass());
+         return mlir::success();
+       }},
+      {"reconcile-unrealized-casts",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+         return mlir::success();
+       }},
+  };
+}
+
+} // namespace
+
 // The NVPTX init functions exist in libLLVMNVPTX*.a but are not declared in the
 // headers from a host-only llvm-build (Targets.def only lists the native target).
 // Forward-declare at file scope so we can call them explicitly.
@@ -216,41 +318,16 @@ static int launchOnGpu(const std::vector<std::string> &ptxModules,
 // GPU backend entry point
 // ---------------------------------------------------------------------------
 
-int runGpu(mlir::ModuleOp module, bool debug, bool launchOnGpuFlag,
-           llvm::StringRef test) {
-  mlir::PassManager pm(module->getContext());
-  if (debug) pm.enableIRPrinting(
-    nullptr,
-    [](mlir::Pass *, mlir::Operation *) { return true; },
-    true, true
-  );
-
-  pm.addPass(mlir::stablehlo::createStablehloLegalizeToLinalgPass());
-  pm.addPass(mlir::createInlinerPass());
-  pm.addPass(mlir::createLinalgElementwiseOpFusionPass());
-
-  mlir::bufferization::OneShotBufferizePassOptions bufOpts;
-  bufOpts.bufferizeFunctionBoundaries = true;
-  pm.addPass(mlir::bufferization::createOneShotBufferizePass(bufOpts));
-
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToParallelLoopsPass());
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createGpuMapParallelLoopsPass());
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertParallelLoopToGpuPass());
-  pm.addPass(mlir::createGpuKernelOutliningPass());
-  pm.addPass(mlir::createLowerAffinePass());
-  pm.addPass(mlir::createSCFToControlFlowPass());
-  pm.addPass(mlir::createConvertControlFlowToLLVMPass());
-  pm.addPass(mlir::createArithToLLVMConversionPass());
-  pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
-  pm.addPass(mlir::createConvertFuncToLLVMPass());
-  pm.addNestedPass<mlir::gpu::GPUModuleOp>(mlir::createConvertGpuOpsToNVVMOps());
-  pm.addNestedPass<mlir::gpu::GPUModuleOp>(mlir::createReconcileUnrealizedCastsPass());
-  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
-
-  if (mlir::failed(pm.run(module))) {
+int runGpu(mlir::ModuleOp module, bool launchOnGpuFlag, llvm::StringRef test,
+           const PipelineOptions &options) {
+  if (mlir::failed(runPipeline(module, buildDefaultGpuPipeline(), options,
+                               llvm::errs()))) {
     llvm::errs() << "GPU pass pipeline failed\n";
     return 1;
   }
+
+  if (options.noExecute)
+    return 0;
 
   // Collect all gpu.modules in order — reduction ops (e.g. matmul) generate
   // multiple kernels (fill + compute) that must be emitted and launched in sequence.

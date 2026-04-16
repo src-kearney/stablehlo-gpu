@@ -20,6 +20,79 @@
 
 #include <vector>
 
+namespace {
+
+std::vector<PipelineStep> buildDefaultCpuPipeline() {
+  mlir::bufferization::OneShotBufferizePassOptions bufOpts;
+  bufOpts.bufferizeFunctionBoundaries = true;
+
+  return {
+      {"stablehlo-legalize-to-linalg",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::stablehlo::createStablehloLegalizeToLinalgPass());
+         return mlir::success();
+       }},
+      {"inline",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createInlinerPass());
+         return mlir::success();
+       }},
+      {"linalg-fuse-elementwise-ops",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createLinalgElementwiseOpFusionPass());
+         return mlir::success();
+       }},
+      {"one-shot-bufferize",
+       [bufOpts](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::bufferization::createOneShotBufferizePass(bufOpts));
+         return mlir::success();
+       }},
+      {"convert-linalg-to-loops",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::func::FuncOp>(
+             mlir::createConvertLinalgToLoopsPass());
+         return mlir::success();
+       }},
+      {"lower-affine",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createLowerAffinePass());
+         return mlir::success();
+       }},
+      {"convert-scf-to-cf",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createSCFToControlFlowPass());
+         return mlir::success();
+       }},
+      {"convert-cf-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createConvertControlFlowToLLVMPass());
+         return mlir::success();
+       }},
+      {"convert-arith-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createArithToLLVMConversionPass());
+         return mlir::success();
+       }},
+      {"finalize-memref-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+         return mlir::success();
+       }},
+      {"convert-func-to-llvm",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createConvertFuncToLLVMPass());
+         return mlir::success();
+       }},
+      {"reconcile-unrealized-casts",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+         return mlir::success();
+       }},
+  };
+}
+
+} // namespace
+
 // ---------------------------------------------------------------------------
 // CPU kernel runners
 // ---------------------------------------------------------------------------
@@ -102,43 +175,26 @@ static int runProjection(mlir::ExecutionEngine &engine) {
 // CPU backend entry point
 // ---------------------------------------------------------------------------
 
-int runCpu(mlir::ModuleOp module, llvm::StringRef test, bool debug) {
+int runCpu(mlir::ModuleOp module, llvm::StringRef test,
+           const PipelineOptions &options) {
   // Tag public functions before the pass pipeline so createConvertFuncToLLVMPass
   // generates the C-interface wrapper.
-  module->walk([](mlir::func::FuncOp func) {
-    if (func.isPublic())
-      func->setAttr("llvm.emit_c_interface",
-        mlir::UnitAttr::get(func.getContext()));
-  });
+  if (!options.noExecute) {
+    module->walk([](mlir::func::FuncOp func) {
+      if (func.isPublic())
+        func->setAttr("llvm.emit_c_interface",
+          mlir::UnitAttr::get(func.getContext()));
+    });
+  }
 
-  mlir::PassManager pm(module->getContext());
-  if (debug) pm.enableIRPrinting(
-    nullptr,
-    [](mlir::Pass *, mlir::Operation *) { return true; },
-    true, true
-  );
-
-  pm.addPass(mlir::stablehlo::createStablehloLegalizeToLinalgPass());
-  pm.addPass(mlir::createInlinerPass());
-  pm.addPass(mlir::createLinalgElementwiseOpFusionPass());
-
-  mlir::bufferization::OneShotBufferizePassOptions bufOpts;
-  bufOpts.bufferizeFunctionBoundaries = true;
-  pm.addPass(mlir::bufferization::createOneShotBufferizePass(bufOpts));
-
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
-  pm.addPass(mlir::createLowerAffinePass());
-  pm.addPass(mlir::createSCFToControlFlowPass());
-  pm.addPass(mlir::createConvertControlFlowToLLVMPass());
-  pm.addPass(mlir::createArithToLLVMConversionPass());
-  pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
-  pm.addPass(mlir::createConvertFuncToLLVMPass());
-  pm.addPass(mlir::createReconcileUnrealizedCastsPass());
-
-  if (mlir::failed(pm.run(module))) {
+  if (mlir::failed(runPipeline(module, buildDefaultCpuPipeline(), options,
+                               llvm::errs()))) {
     llvm::errs() << "CPU pass pipeline failed\n";
     return 1;
   }
+
+  if (options.noExecute)
+    return 0;
 
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

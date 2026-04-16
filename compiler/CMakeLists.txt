@@ -15,7 +15,9 @@ include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
 
-# StableHLO — no config file, point directly at headers and libs
+# MLIR packages ship a CMake config file (MLIRConfig.cmake) so find_package() works.
+# StableHLO doesn't. It has no install target that generates one.
+# Instead we add its source and build directories to the include/link paths directly.
 if(NOT DEFINED STABLEHLO_ROOT)
   message(FATAL_ERROR "Set STABLEHLO_ROOT to your stablehlo source directory")
 endif()
@@ -38,7 +40,7 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-add_executable(remora main.cpp cpu.cpp gpu.cpp)
+add_executable(remora main.cpp cpu.cpp gpu.cpp pipeline.cpp)
 
 # Optional CUDA harness — enables --run-gpu flag.
 # Requires CUDA Toolkit on the target machine (not needed for --emit-ptx on Mac).
