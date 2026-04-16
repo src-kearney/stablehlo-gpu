@@ -67,3 +67,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Docs (local drafts)
+docs/
