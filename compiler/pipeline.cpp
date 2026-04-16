@@ -28,6 +28,7 @@ mlir::LogicalResult writePhaseDir(mlir::ModuleOp module,
                                    llvm::raw_ostream &errorStream) {
   char prefix[8];
   std::snprintf(prefix, sizeof(prefix), "%02u", index);
+  // Twine is LLVM's lazy string concat. Defers allocation until .str().
   std::string dirPath =
       (llvm::Twine(root) + "/" + prefix + "-" + sanitizeForFilename(label))
           .str();
@@ -66,6 +67,8 @@ bool isNameChar(char c) {
          c == '.';
 }
 
+// Extracts the pass name from a pipeline fragment like "convert-scf-to-cf{option=1}".
+// Reads leading name chars and stops at the first '(' or '{'.
 std::string inferStepName(llvm::StringRef pipelineFragment) {
   llvm::StringRef trimmed = pipelineFragment.trim();
   size_t i = 0;
@@ -74,6 +77,9 @@ std::string inferStepName(llvm::StringRef pipelineFragment) {
   return i == 0 ? "pipeline-step" : trimmed.substr(0, i).str();
 }
 
+// Splits "builtin.module(pass1,pass2(opt),pass3)" into one PipelineStep per pass for per-step IR capture.
+// Tracks nesting depth so commas inside pass options like "pass{key=a,b}" are not treated as separators.
+// There's gotta be a better way to write the following. More concisely at least.
 mlir::LogicalResult splitTopLevelPipeline(
     llvm::StringRef pipeline, std::vector<PipelineStep> &steps,
     llvm::raw_ostream &errorStream) {
