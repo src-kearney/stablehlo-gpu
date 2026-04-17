@@ -1,6 +1,6 @@
 #include "cpu.h"
+#include "cpu_tests.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
-#include "mlir/ExecutionEngine/MemRefUtils.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Transforms/Passes.h"
@@ -94,84 +94,6 @@ std::vector<PipelineStep> buildDefaultCpuPipeline() {
 } // namespace
 
 // ---------------------------------------------------------------------------
-// CPU kernel runners
-// ---------------------------------------------------------------------------
-
-// Inputs: x = all 1.0, bias = all -0.5
-// Expected: relu(1.0 + (-0.5)) = relu(0.5) = 0.5 everywhere
-static int runElementwise(mlir::ExecutionEngine &engine) {
-  const int64_t N = 1, T = 512, D = 768;
-  std::vector<float> x_data(N * T * D, 1.0f);
-  std::vector<float> bias_data(D, -0.5f);
-
-  StridedMemRefType<float, 3> x_desc;
-  x_desc.basePtr = x_desc.data = x_data.data();
-  x_desc.offset = 0;
-  x_desc.sizes[0] = N; x_desc.sizes[1] = T; x_desc.sizes[2] = D;
-  x_desc.strides[0] = T * D; x_desc.strides[1] = D; x_desc.strides[2] = 1;
-
-  StridedMemRefType<float, 1> bias_desc;
-  bias_desc.basePtr = bias_desc.data = bias_data.data();
-  bias_desc.offset = 0;
-  bias_desc.sizes[0] = D;
-  bias_desc.strides[0] = 1;
-
-  StridedMemRefType<float, 3> result;
-
-  auto sym = engine.lookup("_mlir_ciface_main");
-  if (!sym) {
-    llvm::handleAllErrors(sym.takeError(), [](const llvm::ErrorInfoBase &e) {
-      llvm::errs() << "Symbol lookup failed: " << e.message() << "\n";
-    });
-    return 1;
-  }
-  auto *fn = reinterpret_cast<void (*)(void *, void *, void *)>(*sym);
-  fn(&result, &x_desc, &bias_desc);
-
-  llvm::outs() << "result[0][0][0] = " << result.data[0] << " (expected 0.5)\n";
-  llvm::outs() << "result[0][0][1] = " << result.data[1] << " (expected 0.5)\n";
-  free(result.basePtr);
-  return 0;
-}
-
-// Inputs: x = all 1.0 (1x512x768), w = all 1/768 (768x768)
-// Expected: dot_general(x, w) = 768 * (1.0 * 1/768) = 1.0 everywhere
-static int runProjection(mlir::ExecutionEngine &engine) {
-  const int64_t N = 1, T = 512, D = 768;
-  std::vector<float> x_data(N * T * D, 1.0f);
-  std::vector<float> w_data(D * D, 1.0f / D);
-
-  StridedMemRefType<float, 3> x_desc;
-  x_desc.basePtr = x_desc.data = x_data.data();
-  x_desc.offset = 0;
-  x_desc.sizes[0] = N; x_desc.sizes[1] = T; x_desc.sizes[2] = D;
-  x_desc.strides[0] = T * D; x_desc.strides[1] = D; x_desc.strides[2] = 1;
-
-  StridedMemRefType<float, 2> w_desc;
-  w_desc.basePtr = w_desc.data = w_data.data();
-  w_desc.offset = 0;
-  w_desc.sizes[0] = D; w_desc.sizes[1] = D;
-  w_desc.strides[0] = D; w_desc.strides[1] = 1;
-
-  StridedMemRefType<float, 3> result;
-
-  auto sym = engine.lookup("_mlir_ciface_main");
-  if (!sym) {
-    llvm::handleAllErrors(sym.takeError(), [](const llvm::ErrorInfoBase &e) {
-      llvm::errs() << "Symbol lookup failed: " << e.message() << "\n";
-    });
-    return 1;
-  }
-  auto *fn = reinterpret_cast<void (*)(void *, void *, void *)>(*sym);
-  fn(&result, &x_desc, &w_desc);
-
-  llvm::outs() << "result[0][0][0] = " << result.data[0] << " (expected 1.0)\n";
-  llvm::outs() << "result[0][0][1] = " << result.data[1] << " (expected 1.0)\n";
-  free(result.basePtr);
-  return 0;
-}
-
-// ---------------------------------------------------------------------------
 // CPU backend entry point
 // ---------------------------------------------------------------------------
 
@@ -206,9 +128,6 @@ int runCpu(mlir::ModuleOp module, llvm::StringRef test,
     });
     return 1;
   }
-  auto &engine = *engineOrErr;
 
-  if (test == "projection")
-    return runProjection(*engine.get());
-  return runElementwise(*engine.get());
+  return runCpuTest(*engineOrErr->get(), test);
 }

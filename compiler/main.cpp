@@ -50,9 +50,9 @@ int main(int argc, char **argv) {
   }
 
   if (!options.noExecute && !emitPtxMode && !runGpuMode &&
-      test != "elementwise" && test != "projection") {
+      test != "elementwise" && test != "projection" && test != "ner") {
     llvm::errs() << "Unknown test '" << test
-                 << "'. Use --test=elementwise or --test=projection\n";
+                 << "'. Use --test=elementwise, --test=projection, or --test=ner\n";
     return 1;
   }
 
