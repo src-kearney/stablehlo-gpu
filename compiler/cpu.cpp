@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "cpu_tests.h"
+#include "dialect/UserDialect.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/InitAllPasses.h"
@@ -27,6 +28,18 @@ std::vector<PipelineStep> buildDefaultCpuPipeline() {
   bufOpts.bufferizeFunctionBoundaries = true;
 
   return {
+      {"user-interpret-preferences",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::func::FuncOp>(
+             remora::user::createInterpretPreferencesPass());
+         return mlir::success();
+       }},
+      {"user-to-stablehlo",
+       [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
+         pm.addNestedPass<mlir::func::FuncOp>(
+             remora::user::createUserToStablehloPass());
+         return mlir::success();
+       }},
       {"stablehlo-legalize-to-linalg",
        [](mlir::OpPassManager &pm, llvm::raw_ostream &) {
          pm.addPass(mlir::stablehlo::createStablehloLegalizeToLinalgPass());

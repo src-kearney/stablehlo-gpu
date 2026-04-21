@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "gpu.h"
+#include "dialect/UserDialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -59,6 +60,7 @@ int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
   mlir::registerAllDialects(registry);
   mlir::stablehlo::registerAllDialects(registry);
+  registry.insert<remora::user::UserDialect>();
   mlir::registerAllPasses();
   mlir::stablehlo::registerStablehloLinalgTransformsPasses();
   mlir::registerAllExtensions(registry); // we should probably turn this off / make more finer grainer
