@@ -36,12 +36,11 @@ import torch
 # vLLM import — warn clearly if not available
 # ---------------------------------------------------------------------------
 try:
-    from vllm.model_executor.layers.fused_moe import fused_moe
+    from vllm.model_executor.layers.fused_moe.fused_moe import fused_moe
 except ImportError:
     print(
-        "ERROR: could not import vllm.model_executor.layers.fused_moe.\n"
-        "Install vLLM:  pip install vllm\n"
-        "or run inside an environment that has vLLM installed.",
+        "ERROR: could not import fused_moe from vLLM.\n"
+        "Install vLLM:  pip install vllm",
         file=sys.stderr,
     )
     sys.exit(1)
