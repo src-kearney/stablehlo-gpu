@@ -88,8 +88,15 @@ mlir::LogicalResult splitTopLevelPipeline(
   size_t close = trimmed.rfind(')');
   if (open == llvm::StringRef::npos || close == llvm::StringRef::npos ||
       close <= open) {
-    errorStream << "Expected a rooted MLIR pipeline like builtin.module(...)\n";
-    return mlir::failure();
+    // Bare pass name with no parentheses — treat as a single step.
+    std::string spec = trimmed.str();
+    steps.push_back(PipelineStep{
+        inferStepName(trimmed),
+        [spec](mlir::OpPassManager &pm,
+               llvm::raw_ostream &errs) -> mlir::LogicalResult {
+          return mlir::parsePassPipeline(spec, pm, errs);
+        }});
+    return mlir::success();
   }
 
   llvm::StringRef anchor = trimmed.substr(0, open).trim();

@@ -40,7 +40,10 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-add_executable(remora main.cpp cpu.cpp cpu_tests.cpp gpu.cpp gpu_tests.cpp pipeline.cpp)
+add_executable(remora main.cpp cpu.cpp cpu_tests.cpp gpu.cpp gpu_tests.cpp pipeline.cpp
+               passes/ExpertOutlining.cpp)
+
+target_compile_options(remora PRIVATE -fno-rtti)
 
 # Optional CUDA harness — enables --run-gpu flag.
 # Requires CUDA Toolkit on the target machine (not needed for --emit-ptx on Mac).

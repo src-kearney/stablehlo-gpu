@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "gpu.h"
+#include "passes/ExpertOutlining.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -60,6 +61,7 @@ int main(int argc, char **argv) {
   mlir::registerAllDialects(registry);
   mlir::stablehlo::registerAllDialects(registry);
   mlir::registerAllPasses();
+  remora::passes::registerExpertOutliningPass();
   mlir::stablehlo::registerStablehloLinalgTransformsPasses();
   mlir::registerAllExtensions(registry); // we should probably turn this off / make more finer grainer
   mlir::registerBuiltinDialectTranslation(registry);
