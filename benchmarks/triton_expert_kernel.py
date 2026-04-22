@@ -28,11 +28,13 @@ import triton.language as tl
 # Keys are (lo, hi) half-open intervals: lo <= num_tokens < hi
 # ---------------------------------------------------------------------------
 BUCKET_CONFIGS: dict[tuple[int, int], dict] = {
-    (0,    50):  {"BLOCK_M": 16,  "BLOCK_N": 64,  "BLOCK_K": 32},
-    (50,  150):  {"BLOCK_M": 32,  "BLOCK_N": 128, "BLOCK_K": 64},
-    (150, 300):  {"BLOCK_M": 64,  "BLOCK_N": 128, "BLOCK_K": 64},
-    (300, 600):  {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 64},
-    (600, 9999): {"BLOCK_M": 256, "BLOCK_N": 256, "BLOCK_K": 64},
+    # Shared memory per launch = (num_stages-1)*(BLOCK_M*BLOCK_K + 2*BLOCK_K*BLOCK_N)*2 bytes
+    # RTX 4090 limit: 101,376 bytes per block.
+    (0,    50):  {"BLOCK_M":  16, "BLOCK_N":  64, "BLOCK_K": 32, "num_stages": 3},  #  3,072 B
+    (50,  150):  {"BLOCK_M":  32, "BLOCK_N": 128, "BLOCK_K": 64, "num_stages": 3},  # 24,576 B
+    (150, 300):  {"BLOCK_M":  64, "BLOCK_N": 128, "BLOCK_K": 64, "num_stages": 3},  # 81,920 B
+    (300, 600):  {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 64, "num_stages": 2},  # 81,920 B ← was 163,840 at ns=3
+    (600, 9999): {"BLOCK_M": 256, "BLOCK_N": 128, "BLOCK_K": 64, "num_stages": 2},  # 65,536 B
 }
 
 # num_warps paired to BLOCK_M — larger tiles benefit from more warps
@@ -159,15 +161,16 @@ def _down_kernel(
 # ---------------------------------------------------------------------------
 
 def _expert_ffn_with_cfg(
-    x:      torch.Tensor,   # [T, D] float16
-    w_gate: torch.Tensor,   # [D, F] float16  (w_gate[e] from outlined @main)
-    w_up:   torch.Tensor,   # [D, F] float16
-    w_down: torch.Tensor,   # [F, D] float16
-    BLOCK_M: int,
-    BLOCK_N: int,
-    BLOCK_K: int,
+    x:         torch.Tensor,   # [T, D] float16
+    w_gate:    torch.Tensor,   # [D, F] float16  (w_gate[e] from outlined @main)
+    w_up:      torch.Tensor,   # [D, F] float16
+    w_down:    torch.Tensor,   # [F, D] float16
+    BLOCK_M:   int,
+    BLOCK_N:   int,
+    BLOCK_K:   int,
     num_warps: int,
-) -> torch.Tensor:          # [T, D] float16
+    num_stages: int = 3,
+) -> torch.Tensor:             # [T, D] float16
     T, D = x.shape
     F    = w_gate.shape[1]
     assert w_gate.shape == (D, F)
@@ -185,7 +188,7 @@ def _expert_ffn_with_cfg(
         w_up.stride(0),   w_up.stride(1),
         hidden.stride(0), hidden.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
-        num_warps=num_warps, num_stages=3,
+        num_warps=num_warps, num_stages=num_stages,
     )
 
     # Down projection → out [T, D]
@@ -198,7 +201,7 @@ def _expert_ffn_with_cfg(
         w_down.stride(0), w_down.stride(1),
         out.stride(0),    out.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
-        num_warps=num_warps, num_stages=3,
+        num_warps=num_warps, num_stages=num_stages,
     )
     return out
 
@@ -210,13 +213,13 @@ def _expert_ffn_with_cfg(
 # launches the right pre-compiled kernel specialization.
 # ---------------------------------------------------------------------------
 
-def _make_dispatch_fn(BLOCK_M: int, BLOCK_N: int, BLOCK_K: int):
+def _make_dispatch_fn(BLOCK_M: int, BLOCK_N: int, BLOCK_K: int, num_stages: int = 3):
     """Closure capturing compile-time constants for one bucket."""
     nw = _BLOCK_M_TO_NUM_WARPS[BLOCK_M]
 
     def dispatch(x, w_gate, w_up, w_down):
         return _expert_ffn_with_cfg(x, w_gate, w_up, w_down,
-                                     BLOCK_M, BLOCK_N, BLOCK_K, nw)
+                                     BLOCK_M, BLOCK_N, BLOCK_K, nw, num_stages)
     return dispatch
 
 
