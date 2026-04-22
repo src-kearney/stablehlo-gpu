@@ -127,3 +127,37 @@ The implication: Remora's advantage is gated on **zero-token expert elimination*
 load imbalance per se. A compiled MLIR dispatch (from ExpertOutliningPass) that emits static
 per-expert control flow would avoid the runtime argsort/bincount entirely and shift the
 crossover to lower concentrations. That is the next optimization target.
+
+## sweep_expert_count — E=8 vs E=16 (pre-stream-parallelism baseline)
+
+> E=32 skipped: estimated weight VRAM ~21 GB exceeds 20 GB guard.
+
+### E=8
+
+| distribution | zero_experts | vllm_ms | remora_ms | speedup | winner |
+|--------------|-------------:|--------:|----------:|--------:|--------|
+| uniform      |     0 of 8   |   6.736 |     7.306 |  0.92x  | vllm   |
+| zipf_0.5     |     0 of 8   |   6.661 |     7.175 |  0.93x  | vllm   |
+| zipf_1.0     |     0 of 8   |   6.971 |     7.286 |  0.96x  | ~tie   |
+| zipf_1.5     |     0 of 8   |   6.948 |     7.455 |  0.93x  | vllm   |
+| zipf_2.0     |     0 of 8   |   6.819 |     7.821 |  0.87x  | vllm   |
+| single       |     6 of 8   |   5.111 |     2.642 |  1.93x  | remora |
+
+### E=16
+
+| distribution | zero_experts | vllm_ms | remora_ms | speedup | winner |
+|--------------|-------------:|--------:|----------:|--------:|--------|
+| uniform      |     0 of 16  |   8.385 |    13.690 |  0.61x  | vllm   |
+| zipf_0.5     |     0 of 16  |   8.251 |    13.478 |  0.61x  | vllm   |
+| zipf_1.0     |     0 of 16  |   8.622 |    13.484 |  0.64x  | vllm   |
+| zipf_1.5     |     0 of 16  |   9.168 |    13.596 |  0.67x  | vllm   |
+| zipf_2.0     |     0 of 16  |   9.516 |    13.635 |  0.70x  | vllm   |
+| single       |    14 of 16  |   5.095 |     2.664 |  1.91x  | remora |
+
+**Key finding:** At E=16, all Zipf distributions still have zero_experts=0 — every expert
+receives at least one token, so all 32 Triton kernel pairs fire sequentially. Remora pays
+argsort+bincount overhead for 16 experts instead of 8, with no idle-expert savings. The gap
+widens to 0.61–0.70x. Single still wins (1.91x) because 14 of 16 experts are truly idle.
+
+The CUDA stream parallelism experiment (next) tests whether launching all 16 expert kernel
+pairs concurrently recovers this gap, or whether the overhead is fundamental.
