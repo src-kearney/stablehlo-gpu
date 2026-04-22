@@ -28,13 +28,11 @@ import triton.language as tl
 # Keys are (lo, hi) half-open intervals: lo <= num_tokens < hi
 # ---------------------------------------------------------------------------
 BUCKET_CONFIGS: dict[tuple[int, int], dict] = {
-    # Shared memory per launch = (num_stages-1)*(BLOCK_M*BLOCK_K + 2*BLOCK_K*BLOCK_N)*2 bytes
-    # RTX 4090 limit: 101,376 bytes per block.
-    (0,    50):  {"BLOCK_M":  16, "BLOCK_N":  64, "BLOCK_K": 32, "num_stages": 3},  #  3,072 B
-    (50,  150):  {"BLOCK_M":  32, "BLOCK_N": 128, "BLOCK_K": 64, "num_stages": 3},  # 24,576 B
-    (150, 300):  {"BLOCK_M":  64, "BLOCK_N": 128, "BLOCK_K": 64, "num_stages": 3},  # 81,920 B
-    (300, 600):  {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 64, "num_stages": 2},  # 81,920 B ← was 163,840 at ns=3
-    (600, 9999): {"BLOCK_M": 256, "BLOCK_N": 128, "BLOCK_K": 64, "num_stages": 2},  # 65,536 B
+    (0,    50):  {"BLOCK_M": 16,  "BLOCK_N": 64,  "BLOCK_K": 32},
+    (50,  150):  {"BLOCK_M": 32,  "BLOCK_N": 128, "BLOCK_K": 64},
+    (150, 300):  {"BLOCK_M": 64,  "BLOCK_N": 128, "BLOCK_K": 64},
+    (300, 600):  {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 64},
+    (600, 9999): {"BLOCK_M": 256, "BLOCK_N": 256, "BLOCK_K": 64},
 }
 
 # num_warps paired to BLOCK_M — larger tiles benefit from more warps
@@ -161,16 +159,15 @@ def _down_kernel(
 # ---------------------------------------------------------------------------
 
 def _expert_ffn_with_cfg(
-    x:         torch.Tensor,   # [T, D] float16
-    w_gate:    torch.Tensor,   # [D, F] float16  (w_gate[e] from outlined @main)
-    w_up:      torch.Tensor,   # [D, F] float16
-    w_down:    torch.Tensor,   # [F, D] float16
-    BLOCK_M:   int,
-    BLOCK_N:   int,
-    BLOCK_K:   int,
+    x:      torch.Tensor,   # [T, D] float16
+    w_gate: torch.Tensor,   # [D, F] float16  (w_gate[e] from outlined @main)
+    w_up:   torch.Tensor,   # [D, F] float16
+    w_down: torch.Tensor,   # [F, D] float16
+    BLOCK_M: int,
+    BLOCK_N: int,
+    BLOCK_K: int,
     num_warps: int,
-    num_stages: int = 3,
-) -> torch.Tensor:             # [T, D] float16
+) -> torch.Tensor:          # [T, D] float16
     T, D = x.shape
     F    = w_gate.shape[1]
     assert w_gate.shape == (D, F)
@@ -188,7 +185,7 @@ def _expert_ffn_with_cfg(
         w_up.stride(0),   w_up.stride(1),
         hidden.stride(0), hidden.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
-        num_warps=num_warps, num_stages=num_stages,
+        num_warps=num_warps, num_stages=3,
     )
 
     # Down projection → out [T, D]
@@ -201,7 +198,7 @@ def _expert_ffn_with_cfg(
         w_down.stride(0), w_down.stride(1),
         out.stride(0),    out.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
-        num_warps=num_warps, num_stages=num_stages,
+        num_warps=num_warps, num_stages=3,
     )
     return out
 
@@ -213,13 +210,13 @@ def _expert_ffn_with_cfg(
 # launches the right pre-compiled kernel specialization.
 # ---------------------------------------------------------------------------
 
-def _make_dispatch_fn(BLOCK_M: int, BLOCK_N: int, BLOCK_K: int, num_stages: int = 3):
+def _make_dispatch_fn(BLOCK_M: int, BLOCK_N: int, BLOCK_K: int):
     """Closure capturing compile-time constants for one bucket."""
     nw = _BLOCK_M_TO_NUM_WARPS[BLOCK_M]
 
     def dispatch(x, w_gate, w_up, w_down):
         return _expert_ffn_with_cfg(x, w_gate, w_up, w_down,
-                                     BLOCK_M, BLOCK_N, BLOCK_K, nw, num_stages)
+                                     BLOCK_M, BLOCK_N, BLOCK_K, nw)
     return dispatch
 
 
@@ -249,56 +246,19 @@ def run_remora_outlined(
     w_gate:        torch.Tensor,         # [E, D, F] float16
     w_up:          torch.Tensor,         # [E, D, F] float16
     w_down:        torch.Tensor,         # [E, F, D] float16
-    min_tokens:    int  = 0,             # skip experts with fewer tokens than this
-    streams:       list = None,          # pre-created CUDA streams, one per expert
 ) -> list[torch.Tensor]:                 # len=E, each [T_e, D] float16
     """
     Dispatch each expert's tokens to the Triton kernel compiled for its
-    token-count bucket.
-
-    min_tokens: experts with 0 < T < min_tokens are skipped; their output is
-    zeros of shape [T, D] so the downstream cat + index_add_ remains valid.
-    Experts with T == 0 are always skipped.
-
-    streams: when provided, each expert's kernels are launched on a separate
-    CUDA stream so they execute concurrently on the GPU.  Pass a list of
-    pre-created torch.cuda.Stream objects (one per expert) created once at
-    startup — stream creation itself is expensive.  A final synchronize()
-    ensures all streams are complete before returning.
+    token-count bucket.  Zero-token experts are passed through unchanged.
     """
-    D       = w_gate.shape[1]   # hidden dim — correct output dim per token
-    E       = len(expert_tokens)
-    outputs = [None] * E
-
+    outputs = []
     for e, x in enumerate(expert_tokens):
         T = x.shape[0]
         if T == 0:
-            outputs[e] = x      # return existing empty slice — no allocation
+            outputs.append(x)
             continue
-        if T < min_tokens:
-            # Below threshold: return zeros so cat+index_add_ downstream stays valid.
-            outputs[e] = torch.zeros(T, D, dtype=x.dtype, device=x.device)
-            continue
-        if streams is not None:
-            with torch.cuda.stream(streams[e]):
-                fn = _get_dispatch_fn(T)
-                outputs[e] = fn(x, w_gate[e], w_up[e], w_down[e])
-        else:
-            fn = _get_dispatch_fn(T)
-            outputs[e] = fn(x, w_gate[e], w_up[e], w_down[e])
-
-    if streams is not None:
-        # GPU-side stream dependency: make the default stream wait for each
-        # expert stream that actually launched kernels.  This avoids a full
-        # torch.cuda.synchronize() (which blocks the CPU and waits for ALL
-        # streams including idle ones) and instead lets CUDA schedule the
-        # downstream cat + index_add_ after the expert streams complete.
-        default = torch.cuda.current_stream()
-        for e, x in enumerate(expert_tokens):
-            T = x.shape[0]
-            if T >= max(min_tokens, 1):   # only streams that launched kernels
-                default.wait_stream(streams[e])
-
+        fn = _get_dispatch_fn(T)
+        outputs.append(fn(x, w_gate[e], w_up[e], w_down[e]))
     return outputs
 
 
@@ -308,41 +268,26 @@ def run_remora_outlined(
 # ---------------------------------------------------------------------------
 
 def warmup_all_buckets(
-    hidden_dim:  int  = 4096,
-    inter_dim:   int  = 14336,
-    device:      str  = "cuda",
-    use_streams: bool = False,
+    hidden_dim: int = 4096,
+    inter_dim:  int = 14336,
+    device:     str = "cuda",
 ) -> None:
     """
     Drive one tiny forward pass per bucket to trigger Triton JIT compilation.
     Uses the minimum representable token count for each bucket.
-
-    use_streams: if True, each bucket's warmup pass runs on a dedicated CUDA
-    stream, ensuring the compiled kernels are cached for non-default streams.
     """
     print("Warming up Triton kernels for all buckets...")
-    dtype        = torch.float16
-    bucket_items = list(BUCKET_CONFIGS.items())
-    streams      = (
-        [torch.cuda.Stream() for _ in bucket_items] if use_streams
-        else [None] * len(bucket_items)
-    )
-
-    for i, ((lo, hi), cfg) in enumerate(bucket_items):
-        T      = max(lo, 1)
+    dtype = torch.float16
+    for (lo, hi), cfg in BUCKET_CONFIGS.items():
+        T = max(lo, 1)          # smallest valid token count in this bucket
         x      = torch.zeros(T, hidden_dim, dtype=dtype, device=device)
         w_gate = torch.zeros(hidden_dim, inter_dim, dtype=dtype, device=device)
         w_up   = torch.zeros(hidden_dim, inter_dim, dtype=dtype, device=device)
         w_down = torch.zeros(inter_dim, hidden_dim, dtype=dtype, device=device)
-        fn     = DISPATCH_TABLE[(lo, hi)]
-        if streams[i] is not None:
-            with torch.cuda.stream(streams[i]):
-                fn(x, w_gate, w_up, w_down)
-        else:
-            fn(x, w_gate, w_up, w_down)
+        fn = DISPATCH_TABLE[(lo, hi)]
+        fn(x, w_gate, w_up, w_down)
         torch.cuda.synchronize()
-        stream_tag = f"  stream {i}" if use_streams else ""
-        print(f"  bucket {lo:4d}–{hi:4d}  BLOCK_M={cfg['BLOCK_M']:3d}  compiled ✓{stream_tag}")
+        print(f"  bucket {lo:4d}–{hi:4d}  BLOCK_M={cfg['BLOCK_M']:3d}  compiled ✓")
     print()
 
 
