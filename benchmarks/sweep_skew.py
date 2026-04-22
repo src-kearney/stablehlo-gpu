@@ -136,7 +136,6 @@ def remora_forward(
     w_down:        torch.Tensor,   # [E, F, D]  float16
     topk_ids:      torch.Tensor,   # [T, top_k]  int32
     topk_weights:  torch.Tensor,   # [T, top_k]  float16
-    streams:       list = None,    # pre-created CUDA streams (one per expert)
 ) -> torch.Tensor:                 # [T, D]  float16
     T, D   = hidden_states.shape
     E      = w_gate.shape[0]
@@ -156,9 +155,8 @@ def remora_forward(
         counts        = torch.bincount(ids_sorted, minlength=E)     # [E]
         expert_tokens = list(x_sorted.split(counts.tolist()))       # list[T_e, D]
 
-        # Dispatch all experts — optionally concurrent on separate CUDA streams.
         expert_outs = run_remora_outlined(
-            expert_tokens, w_gate, w_up, w_down, streams=streams
+            expert_tokens, w_gate, w_up, w_down
         )
 
         # Scatter back — one cat + one index_add_ replaces E masked index_put calls.
