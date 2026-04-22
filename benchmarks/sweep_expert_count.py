@@ -160,10 +160,8 @@ def main() -> None:
     print()
 
     # Pre-compile Triton buckets once (shared across all expert counts).
-    # use_streams=True warms up on separate streams so the compiled kernels
-    # are cached for non-default streams from the first real launch.
     warmup_all_buckets(hidden_dim=HIDDEN_DIM, inter_dim=INTERMEDIATE_DIM,
-                       device=device, use_streams=True)
+                       device=device)
 
     all_results:  dict[str, dict] = {}
     summary_rows: list[dict]      = []
@@ -180,10 +178,6 @@ def main() -> None:
         print(f"\n{'=' * 60}")
         print(f"experts = {E}   (estimated weight VRAM: {needed_gb:.1f} GB)")
         print(f"{'=' * 60}")
-
-        # Pre-create one CUDA stream per expert (stream creation is expensive;
-        # do it once per expert count, outside the distribution timing loop).
-        expert_streams = [torch.cuda.Stream() for _ in range(E)]
 
         # Allocate weights for this expert count
         torch.manual_seed(0)
@@ -225,7 +219,6 @@ def main() -> None:
             remora_ms = _timed(
                 lambda: remora_forward(
                     hidden_states, w_gate, w_up, w_down, topk_ids, topk_weights,
-                    streams=expert_streams,
                 ),
                 WARMUP_ITERS, TIMED_ITERS,
             )

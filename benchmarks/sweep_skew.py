@@ -235,10 +235,7 @@ def main() -> None:
 
     # ---- Pre-compile all Triton bucket kernels -----------------------------
     warmup_all_buckets(hidden_dim=HIDDEN_DIM, inter_dim=INTERMEDIATE_DIM,
-                       device=device, use_streams=True)
-
-    # ---- Pre-create CUDA streams (once — stream creation is expensive) -----
-    expert_streams = [torch.cuda.Stream() for _ in range(NUM_EXPERTS)]
+                       device=device)
 
     # ---- Header ------------------------------------------------------------
     col = 10
@@ -274,11 +271,10 @@ def main() -> None:
             WARMUP_ITERS, TIMED_ITERS,
         )
 
-        # Remora — per-expert bucket dispatch, concurrent on separate streams
+        # Remora — per-expert bucket dispatch, sequential
         remora_ms = _timed(
             lambda: remora_forward(
                 hidden_states, w_gate, w_up, w_down, topk_ids, topk_weights,
-                streams=expert_streams,
             ),
             WARMUP_ITERS, TIMED_ITERS,
         )
