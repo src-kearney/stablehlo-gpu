@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "hidden_dim": 4096,
+    "intermediate_dim": 14336,
+    "num_experts": 8,
+    "top_k": 2,
+    "batch_size": 512,
+    "dtype": "torch.float16",
+    "warmup_iters": 5,
+    "timed_iters": 50
+  },
+  "results": {
+    "uniform": {
+      "vllm_ms": 6.7488,
+      "remora_ms": 6.7218,
+      "speedup": 1.004,
+      "vllm_tok_s": 75865.3,
+      "remora_tok_s": 76169.8,
+      "tokens_per_expert": [
+        140,
+        131,
+        132,
+        131,
+        117,
+        125,
+        128,
+        120
+      ]
+    },
+    "zipf_0.5": {
+      "vllm_ms": 6.6635,
+      "remora_ms": 6.8848,
+      "speedup": 0.968,
+      "vllm_tok_s": 76836.8,
+      "remora_tok_s": 74366.2,
+      "tokens_per_expert": [
+        215,
+        173,
+        129,
+        114,
+        105,
+        109,
+        93,
+        86
+      ]
+    },
+    "zipf_1.0": {
+      "vllm_ms": 6.9647,
+      "remora_ms": 7.1049,
+      "speedup": 0.98,
+      "vllm_tok_s": 73513.5,
+      "remora_tok_s": 72063.3,
+      "tokens_per_expert": [
+        313,
+        202,
+        142,
+        89,
+        83,
+        68,
+        70,
+        57
+      ]
+    },
+    "zipf_1.5": {
+      "vllm_ms": 6.9449,
+      "remora_ms": 7.5172,
+      "speedup": 0.924,
+      "vllm_tok_s": 73723.4,
+      "remora_tok_s": 68110.8,
+      "tokens_per_expert": [
+        420,
+        220,
+        127,
+        77,
+        71,
+        53,
+        31,
+        25
+      ]
+    },
+    "zipf_2.0": {
+      "vllm_ms": 6.8254,
+      "remora_ms": 7.657,
+      "speedup": 0.891,
+      "vllm_tok_s": 75013.5,
+      "remora_tok_s": 66867.3,
+      "tokens_per_expert": [
+        462,
+        272,
+        117,
+        56,
+        32,
+        39,
+        32,
+        14
+      ]
+    },
+    "single": {
+      "vllm_ms": 5.1092,
+      "remora_ms": 2.6327,
+      "speedup": 1.941,
+      "vllm_tok_s": 100211.4,
+      "remora_tok_s": 194476.9,
+      "tokens_per_expert": [
+        512,
+        512,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

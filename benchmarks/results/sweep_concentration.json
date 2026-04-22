@@ -1,0 +1,359 @@
+{
+  "meta": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "hidden_dim": 4096,
+    "intermediate_dim": 14336,
+    "num_experts": 8,
+    "top_k": 2,
+    "batch_size": 512,
+    "dtype": "torch.float16",
+    "warmup_iters": 5,
+    "timed_iters": 50,
+    "win_remora_threshold": 1.05,
+    "win_vllm_threshold": 0.95
+  },
+  "results": {
+    "0.1250": {
+      "concentration": 0.125,
+      "top_expert_tokens": 140,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        140,
+        131,
+        132,
+        131,
+        117,
+        125,
+        128,
+        120
+      ],
+      "vllm_ms": 6.7532,
+      "remora_ms": 7.3107,
+      "speedup": 0.924,
+      "winner": "vllm"
+    },
+    "0.2500": {
+      "concentration": 0.25,
+      "top_expert_tokens": 236,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        236,
+        124,
+        109,
+        108,
+        103,
+        123,
+        106,
+        115
+      ],
+      "vllm_ms": 6.0375,
+      "remora_ms": 7.1823,
+      "speedup": 0.841,
+      "winner": "vllm"
+    },
+    "0.3750": {
+      "concentration": 0.375,
+      "top_expert_tokens": 319,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        319,
+        103,
+        100,
+        84,
+        98,
+        94,
+        116,
+        110
+      ],
+      "vllm_ms": 6.5764,
+      "remora_ms": 7.3736,
+      "speedup": 0.892,
+      "winner": "vllm"
+    },
+    "0.5000": {
+      "concentration": 0.5,
+      "top_expert_tokens": 402,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        402,
+        103,
+        93,
+        84,
+        95,
+        92,
+        74,
+        81
+      ],
+      "vllm_ms": 7.3579,
+      "remora_ms": 7.4302,
+      "speedup": 0.99,
+      "winner": "~tie"
+    },
+    "0.6250": {
+      "concentration": 0.625,
+      "top_expert_tokens": 445,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        445,
+        87,
+        74,
+        78,
+        63,
+        99,
+        99,
+        79
+      ],
+      "vllm_ms": 6.8066,
+      "remora_ms": 7.7263,
+      "speedup": 0.881,
+      "winner": "vllm"
+    },
+    "0.7000": {
+      "concentration": 0.7,
+      "top_expert_tokens": 470,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        470,
+        92,
+        74,
+        67,
+        81,
+        82,
+        81,
+        77
+      ],
+      "vllm_ms": 7.2064,
+      "remora_ms": 7.5018,
+      "speedup": 0.961,
+      "winner": "~tie"
+    },
+    "0.7500": {
+      "concentration": 0.75,
+      "top_expert_tokens": 493,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        493,
+        80,
+        71,
+        82,
+        74,
+        63,
+        85,
+        76
+      ],
+      "vllm_ms": 7.0604,
+      "remora_ms": 7.6321,
+      "speedup": 0.925,
+      "winner": "vllm"
+    },
+    "0.8000": {
+      "concentration": 0.8,
+      "top_expert_tokens": 499,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        499,
+        74,
+        68,
+        75,
+        71,
+        79,
+        86,
+        72
+      ],
+      "vllm_ms": 7.2066,
+      "remora_ms": 7.5772,
+      "speedup": 0.951,
+      "winner": "~tie"
+    },
+    "0.8500": {
+      "concentration": 0.85,
+      "top_expert_tokens": 497,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        497,
+        70,
+        77,
+        61,
+        85,
+        71,
+        92,
+        71
+      ],
+      "vllm_ms": 7.191,
+      "remora_ms": 7.6831,
+      "speedup": 0.936,
+      "winner": "vllm"
+    },
+    "0.8750": {
+      "concentration": 0.875,
+      "top_expert_tokens": 505,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        505,
+        72,
+        83,
+        64,
+        72,
+        78,
+        70,
+        80
+      ],
+      "vllm_ms": 7.1911,
+      "remora_ms": 7.7069,
+      "speedup": 0.933,
+      "winner": "vllm"
+    },
+    "0.9000": {
+      "concentration": 0.9,
+      "top_expert_tokens": 506,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        506,
+        78,
+        74,
+        76,
+        64,
+        79,
+        82,
+        65
+      ],
+      "vllm_ms": 7.1905,
+      "remora_ms": 7.6705,
+      "speedup": 0.937,
+      "winner": "vllm"
+    },
+    "0.9250": {
+      "concentration": 0.925,
+      "top_expert_tokens": 510,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        510,
+        77,
+        76,
+        73,
+        69,
+        69,
+        73,
+        77
+      ],
+      "vllm_ms": 7.2149,
+      "remora_ms": 7.8195,
+      "speedup": 0.923,
+      "winner": "vllm"
+    },
+    "0.9375": {
+      "concentration": 0.9375,
+      "top_expert_tokens": 511,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        511,
+        73,
+        74,
+        69,
+        64,
+        67,
+        92,
+        74
+      ],
+      "vllm_ms": 7.195,
+      "remora_ms": 7.7307,
+      "speedup": 0.931,
+      "winner": "vllm"
+    },
+    "0.9500": {
+      "concentration": 0.95,
+      "top_expert_tokens": 511,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        511,
+        68,
+        66,
+        78,
+        83,
+        60,
+        80,
+        78
+      ],
+      "vllm_ms": 7.063,
+      "remora_ms": 7.669,
+      "speedup": 0.921,
+      "winner": "vllm"
+    },
+    "0.9625": {
+      "concentration": 0.9625,
+      "top_expert_tokens": 512,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        512,
+        66,
+        76,
+        76,
+        64,
+        74,
+        84,
+        72
+      ],
+      "vllm_ms": 7.189,
+      "remora_ms": 7.7852,
+      "speedup": 0.923,
+      "winner": "vllm"
+    },
+    "0.9750": {
+      "concentration": 0.975,
+      "top_expert_tokens": 512,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        512,
+        75,
+        74,
+        85,
+        79,
+        67,
+        68,
+        64
+      ],
+      "vllm_ms": 6.9411,
+      "remora_ms": 7.3411,
+      "speedup": 0.946,
+      "winner": "vllm"
+    },
+    "0.9875": {
+      "concentration": 0.9875,
+      "top_expert_tokens": 512,
+      "zero_expert_count": 0,
+      "tokens_per_expert": [
+        512,
+        64,
+        81,
+        80,
+        63,
+        76,
+        70,
+        78
+      ],
+      "vllm_ms": 6.7589,
+      "remora_ms": 7.3398,
+      "speedup": 0.921,
+      "winner": "vllm"
+    },
+    "1.0000": {
+      "concentration": 1.0,
+      "top_expert_tokens": 512,
+      "zero_expert_count": 6,
+      "tokens_per_expert": [
+        512,
+        512,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "vllm_ms": 5.1061,
+      "remora_ms": 2.6235,
+      "speedup": 1.946,
+      "winner": "remora"
+    }
+  }
+}
